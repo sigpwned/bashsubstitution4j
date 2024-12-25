@@ -5,12 +5,12 @@
 
     <groupId>com.sigpwned</groupId>
     <artifactId>bashsubstitution4j</artifactId>
-    <version>1.0.0</version>
+    <version>0.0.0</version>
     <packaging>jar</packaging>
 
     <name>bashsubstitution4j</name>
-    <description>A library for implementing Bash-like substitution rules in Java</description>
-    <url>https://github.com/sigpwned/bashsubstitution4j</url> <!-- Replace with actual project URL if available -->
+    <description>A Java library for performing Bash substitutions on text</description>
+    <url>https://github.com/sigpwned/bashsubstitution4j</url>
 
     <licenses>
         <license>

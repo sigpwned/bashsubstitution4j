@@ -82,6 +82,7 @@ public final class Globbing {
           iterator.next();
         }
         sb.append(']');
+        iterator.next();
       } else {
         sb.append(Pattern.quote(String.valueOf(iterator.current())));
         iterator.next();

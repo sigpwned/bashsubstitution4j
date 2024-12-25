@@ -13,9 +13,15 @@ import com.sigpwned.bashsubstitution4j.util.Patterns;
 
 public class BashSubstitutor {
   private final Map<String, String> env;
+  private boolean strict;
 
   public BashSubstitutor(Map<String, String> env) {
+    this(env, false);
+  }
+
+  public BashSubstitutor(Map<String, String> env, boolean strict) {
     this.env = requireNonNull(env);
+    this.strict = strict;
   }
 
   /**
@@ -112,6 +118,9 @@ public class BashSubstitutor {
     } else if (Parsing.attempt(iterator, ":+")) {
       final CharSequence errorMessage = Parsing.slurp(iterator);
       return handleColonPlusExpr(parameter.toString(), errorMessage);
+    } else if (Parsing.attempt(iterator, ":?")) {
+      final CharSequence errorMessage = Parsing.slurp(iterator);
+      return handleColonQuestionExpr(parameter.toString(), errorMessage);
     } else if (Parsing.attempt(iterator, ":")) {
       final int position = Parsing.parseInt(iterator);
       if (Parsing.attempt(iterator, ":")) {
@@ -237,25 +246,31 @@ public class BashSubstitutor {
   }
 
   /**
-   * Returns the empty string if the given name is unset, otherwise prints the given message to
-   * stderr and exits with status 1.
+   * Returns the value of the given name if set and not empty, otherwise throws an exception with
+   * the given message, or a reasonable default if the message is empty.
    * 
    * @param name the name of the environment variable
-   * @param message the message to print to stderr if the environment variable is unset
+   * @param message the message to include in the exception if the environment variable is unset or
+   *        empty
    * @return the empty string if the environment variable is unset
    * 
+   * @throws UnsetVariableInSubstitutionException if the environment variable is unset or empty
    */
-  // private CharSequence handleColonQuestionExpr(String name, CharSequence message) {
-  // if (name == null)
-  // throw new NullPointerException();
-  // if (message == null)
-  // throw new NullPointerException();
-  // if (findEnvironmentVariable(name).isPresent())
-  // return "";
-  // stderr.println(message);
-  // System.exit(1);
-  // return "";
-  // }
+  private CharSequence handleColonQuestionExpr(String name, CharSequence message) {
+    if (name == null)
+      throw new NullPointerException();
+    if (message == null)
+      throw new NullPointerException();
+
+    Optional<CharSequence> maybeValue = findEnvironmentVariable(name);
+    if (maybeValue.isPresent())
+      return maybeValue.get();
+
+    if (message.length() == 0)
+      throw new UnsetVariableInSubstitutionException(name);
+    else
+      throw new UnsetVariableInSubstitutionException(name, message.toString());
+  }
 
   /**
    * Returns the substring of the value of the specified environment variable, starting at the
@@ -456,6 +471,9 @@ public class BashSubstitutor {
       throw new NullPointerException();
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
+    
+    if (pattern.length() == 0)
+      pattern = "?";
 
     final Pattern p =
         Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
@@ -471,6 +489,9 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
 
+    if (pattern.length() == 0)
+      pattern = "?";
+
     final Pattern p =
         Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
 
@@ -485,6 +506,9 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
 
+    if (pattern.length() == 0)
+      pattern = "?";
+
     final Pattern p =
         Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
 
@@ -498,6 +522,9 @@ public class BashSubstitutor {
       throw new NullPointerException();
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
+
+    if (pattern.length() == 0)
+      pattern = "?";
 
     final Pattern p =
         Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
@@ -531,10 +558,28 @@ public class BashSubstitutor {
    * @return the value of the environment variable
    */
   protected Optional<CharSequence> findEnvironmentVariable(String name) {
-    return Optional.ofNullable(getEnv().get(name));
+    CharSequence result = getEnv().get(name);
+    if (result == null) {
+      if (getEnv().containsKey(name))
+        return Optional.empty();
+      if (isStrict())
+        throw new UnsetVariableInSubstitutionException(name);
+      return Optional.empty();
+    }
+    if (result.length() == 0)
+      return Optional.empty();
+    return Optional.of(result);
   }
 
   public Map<String, String> getEnv() {
     return unmodifiableMap(env);
+  }
+
+  public boolean isStrict() {
+    return strict;
+  }
+
+  public void setStrict(boolean strict) {
+    this.strict = strict;
   }
 }

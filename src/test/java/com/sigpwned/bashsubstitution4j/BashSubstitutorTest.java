@@ -46,6 +46,12 @@ public class BashSubstitutorTest {
   }
 
   @Test
+  void givenDefaultValueSyntax_whenVariableIsEmpty_thenDefaultValueUsed() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", ""));
+    assertEquals("default", substitutor.substitute("${NAME:-default}"));
+  }
+
+  @Test
   void givenDefaultValueSyntax_whenVariableIsUnset_thenDefaultValueUsed() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf());
     assertEquals("default", substitutor.substitute("${NAME:-default}"));
@@ -67,6 +73,26 @@ public class BashSubstitutorTest {
   void givenAlternateValueSyntax_whenVariableIsUnset_thenReturnsEmptyString() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf());
     assertEquals("", substitutor.substitute("${NAME:+alternate}"));
+  }
+
+  @Test
+  void givenColonQuestionSyntax_whenSubstituteWithUnsetVariable_thenThrowsException() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf());
+    assertThrows(UnsetVariableInSubstitutionException.class,
+        () -> substitutor.substitute("${NAME:?}"));
+  }
+
+  @Test
+  void givenColonQuestionSyntax_whenSubstituteWithEmptyVariable_thenThrowsException() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", ""));
+    assertThrows(UnsetVariableInSubstitutionException.class,
+        () -> substitutor.substitute("${NAME:?}"));
+  }
+
+  @Test
+  void givenColonQuestionSyntax_whenSubstituteWithPopulatedVariable_thenReturnsValue() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("VALUE", substitutor.substitute("${NAME:?}"));
   }
 
   @Test
@@ -113,9 +139,93 @@ public class BashSubstitutorTest {
   }
 
   @Test
+  void givenPatternAtStart_whenNotReplaced_thenReturnsOriginalValue() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "valuePATTERN"));
+    assertEquals("valuePATTERN", substitutor.substitute("${NAME/#PATTERN/REPLACEMENT}"));
+  }
+
+  @Test
   void givenPatternAtEnd_whenReplaced_thenReturnsModifiedValue() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "valuePATTERN"));
     assertEquals("valueREPLACEMENT", substitutor.substitute("${NAME/%PATTERN/REPLACEMENT}"));
+  }
+
+  @Test
+  void givenPatternAtEnd_whenNotReplaced_thenReturnsOriginalValue() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "PATTERNvalue"));
+    assertEquals("PATTERNvalue", substitutor.substitute("${NAME/%PATTERN/REPLACEMENT}"));
+  }
+
+  @Test
+  void givenCommaSubstitutionWithoutPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("vALUE", substitutor.substitute("${NAME,}"));
+  }
+
+  @Test
+  void givenCommaSubstitutionWithMatchingPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("vALUE", substitutor.substitute("${NAME,[V]}"));
+  }
+
+  @Test
+  void givenCommaSubstitutionWithNonMatchingPattern_whenSubstituted_thenNoChange() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("VALUE", substitutor.substitute("${NAME,[X]}"));
+  }
+
+  @Test
+  void givenCommaCommaSubstitutionWithoutPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("value", substitutor.substitute("${NAME,,}"));
+  }
+
+  @Test
+  void givenCommaCommaSubstitutionWithMatchingPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("valUE", substitutor.substitute("${NAME,,[VAL]}"));
+  }
+
+  @Test
+  void givenCommaCommaSubstitutionWithNonMatchingPattern_whenSubstituted_thenNoChange() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VALUE"));
+    assertEquals("VALUE", substitutor.substitute("${NAME,,[X]}"));
+  }
+
+  @Test
+  void givenCaretSubstitutionWithoutPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("Value", substitutor.substitute("${NAME^}"));
+  }
+
+  @Test
+  void givenCaretSubstitutionWithMatchingPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("Value", substitutor.substitute("${NAME^[v]}"));
+  }
+
+  @Test
+  void givenCaretSubstitutionWithNonMatchingPattern_whenSubstituted_thenNoChange() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("value", substitutor.substitute("${NAME^[x]}"));
+  }
+
+  @Test
+  void givenCaretCaretSubstitutionWithoutPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("VALUE", substitutor.substitute("${NAME^^}"));
+  }
+
+  @Test
+  void givenCaretCaretSubstitutionWithMatchingPattern_whenSubstituted_thenFirstCharacterLowercased() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("VALue", substitutor.substitute("${NAME^^[val]}"));
+  }
+
+  @Test
+  void givenCaretCaretSubstitutionWithNonMatchingPattern_whenSubstituted_thenNoChange() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
+    assertEquals("value", substitutor.substitute("${NAME^^[x]}"));
   }
 
   @Test
@@ -125,7 +235,13 @@ public class BashSubstitutorTest {
   }
 
   @Test
-  void givenUppercaseTransformation_whenVariableSubstituted_thenConvertedToUppercase() {
+  void givenFirstUppercaseTransformation_whenVariableSubstituted_thenConvertedToUppercase() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "hello"));
+    assertEquals("Hello", substitutor.substitute("${NAME@u}"));
+  }
+
+  @Test
+  void givenAllUppercaseTransformation_whenVariableSubstituted_thenConvertedToUppercase() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "hello"));
     assertEquals("HELLO", substitutor.substitute("${NAME@U}"));
   }
@@ -134,6 +250,19 @@ public class BashSubstitutorTest {
   void givenNullInput_whenSubstituted_thenThrowsNullPointerException() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
     assertThrows(NullPointerException.class, () -> substitutor.substitute(null));
+  }
+
+  @Test
+  void givenStrictSubstitutor_whenSubstituteWithUnsetVariable_thenThrowsException() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf(), true);
+    assertThrows(UnsetVariableInSubstitutionException.class,
+        () -> substitutor.substitute("${NAME}"));
+  }
+
+  @Test
+  void givenStrictSubstitutor_whenSubstituteWithEmptyVariable_thenThrowsException() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", ""), true);
+    assertEquals("", substitutor.substitute("${NAME}"));
   }
 
   @Test
