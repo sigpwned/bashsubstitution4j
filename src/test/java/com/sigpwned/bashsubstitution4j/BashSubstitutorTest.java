@@ -40,6 +40,12 @@ public class BashSubstitutorTest {
   }
 
   @Test
+  void givenIndirectVariableName_whenSubstituted_thenReplacedWithValue() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "VAR", "VAR", "value"));
+    assertEquals("value", substitutor.substitute("${!NAME}"));
+  }
+
+  @Test
   void givenUnsetVariable_whenSubstituted_thenReturnsEmptyString() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf());
     assertEquals("", substitutor.substitute("${NAME}"));
@@ -58,6 +64,12 @@ public class BashSubstitutorTest {
   }
 
   @Test
+  void givenDefaultValueSyntax_whenVariableIsUnsetStrict_thenDefaultValueUsed() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf(), true);
+    assertEquals("default", substitutor.substitute("${NAME:-default}"));
+  }
+
+  @Test
   void givenDefaultValueSyntax_whenVariableIsSet_thenVariableValueUsed() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf("NAME", "value"));
     assertEquals("value", substitutor.substitute("${NAME:-default}"));
@@ -72,6 +84,12 @@ public class BashSubstitutorTest {
   @Test
   void givenAlternateValueSyntax_whenVariableIsUnset_thenReturnsEmptyString() {
     BashSubstitutor substitutor = new BashSubstitutor(mapOf());
+    assertEquals("", substitutor.substitute("${NAME:+alternate}"));
+  }
+
+  @Test
+  void givenAlternateValueSyntax_whenVariableIsUnsetStrict_thenReturnsEmptyString() {
+    BashSubstitutor substitutor = new BashSubstitutor(mapOf(), true);
     assertEquals("", substitutor.substitute("${NAME:+alternate}"));
   }
 

@@ -11,21 +11,125 @@ import com.sigpwned.bashsubstitution4j.util.Globbing;
 import com.sigpwned.bashsubstitution4j.util.Parsing;
 import com.sigpwned.bashsubstitution4j.util.Patterns;
 
+/**
+ * A class for performing {@link Bash https://en.wikipedia.org/wiki/Bash_(Unix_shell)}-like
+ * substitution on strings.
+ * 
+ * <h2>Supported Syntax</h2>
+ * 
+ * <p>
+ * This implementation supports the following syntax with the same semantics as defined by
+ * <a href="https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html">the
+ * Bash manual</a>.
+ * 
+ * <ul>
+ * <li><code>${NAME}</code></li>
+ * <li><code>${NAME:-DEFAULT}</code></li>
+ * <li><code>${NAME:+ERROR_MESSAGE}</code></li>
+ * <li><code>${NAME#PREFIX}</code></li>
+ * <li><code>${NAME##PREFIX}</code></li>
+ * <li><code>${NAME%SUFFIX}</code></li>
+ * <li><code>${NAME%%SUFFIX}</code></li>
+ * <li><code>${NAME/PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME//PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME/#PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME/%PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME@X}</code></li>
+ * </ul>
+ * 
+ * <p>
+ * Additionally, indirect reference syntax <code>${!NAME}</code> is supported and applies to all
+ * listed substitution rules. For example, if <code>NAME</code> is set to "VAR",
+ * <code>${!NAME}</code> will reference the value of the variable "VAR" and apply the specified
+ * substitution rule (e.g., <code>${!NAME:-DEFAULT}</code>).
+ * 
+ * <p>
+ * Only regular string variables are supported. Array variables and other complex data types are not
+ * supported by this implementation at this time.
+ * 
+ * <h2>Strict Mode</h2>
+ * 
+ * <p>
+ * Instances of this class can be created with strict mode enabled.
+ * 
+ * <p>
+ * If strict mode is disabled, then any references to an unset variable will be treated as if the
+ * variable were set with the value of <code>""</code>.
+ * 
+ * <p>
+ * If strict mode is enabled, then evaluating a substitution that references an unset variable will
+ * result in an {@link UnsetVariableInSubstitutionException} being thrown. This additional error
+ * checking applies to all syntax without a built-in default-handling mechanism, which is to say the
+ * following substitution patterns:
+ * 
+ * <ul>
+ * <li><code>${NAME}</code></li>
+ * <li><code>${NAME#PREFIX}</code></li>
+ * <li><code>${NAME##PREFIX}</code></li>
+ * <li><code>${NAME%SUFFIX}</code></li>
+ * <li><code>${NAME%%SUFFIX}</code></li>
+ * <li><code>${NAME/PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME//PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME/#PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME/%PATTERN/REPLACEMENT}</code></li>
+ * <li><code>${NAME@X}</code></li>
+ * </ul>
+ * 
+ * <p>
+ * Additionally, strict mode will cause an exception to be thrown when evaluating an indirect
+ * reference if the given variable does not exist, but will simply return an empty string if the
+ * referenced variable does not exist. For example, evaluating <code>${!NAME}</code> when
+ * <code>NAME</code> is unset will result in an exception; however, evaluating <code>${!NAME}</code>
+ * when <code>NAME</code> is set to <code>"MISSING"</code> and <code>MISSING</code> is unset, will
+ * substitute the empty string.
+ * 
+ * <h2>Unsupported Syntax</h2>
+ * 
+ * <p>
+ * This implementation performs variable substitution only. It does not support the following
+ * additional expansion mechanisms or syntax:
+ * 
+ * <ul>
+ * <li>Arithmetic expansion</li>
+ * <li>Command substitution</li>
+ * <li>Process substitution</li>
+ * <li>Word splitting</li>
+ * <li>Filename expansion (globbing)</li>
+ * <li>Tilde expansion</li>
+ * <li>Brace expansion</li>
+ * <li>Quoting</li>
+ * <li>Escape characters</li>
+ * <li>Array variables</li>
+ * </ul>
+ */
 public class BashSubstitutor {
   private final Map<String, String> env;
   private boolean strict;
 
+  /**
+   * Equivalent to <code>new BashSubstitutor(System.getenv(), false)</code>.
+   *
+   * @param env the required environment variables to use for substitution
+   * 
+   * @see #BashSubstitutor(Map, boolean)
+   */
   public BashSubstitutor(Map<String, String> env) {
     this(env, false);
   }
 
+  /**
+   * @param env the required environment variables to use for substitution
+   * @param strict whether to enable strict
+   * 
+   * @throws NullPointerException if env is null
+   */
   public BashSubstitutor(Map<String, String> env, boolean strict) {
     this.env = requireNonNull(env);
     this.strict = strict;
   }
 
   /**
-   * Implements bash substitution rules:
+   * Implements bash substitution rules, including indirect reference (${!NAME}) support:
    *
    * <ul>
    * <li><code>${NAME}</code></li>
@@ -41,7 +145,12 @@ public class BashSubstitutor {
    * <li><code>${NAME/%PATTERN/REPLACEMENT}</code></li>
    * <li><code>${NAME@X}</code></li>
    * </ul>
-   *
+   * 
+   * Indirect reference syntax <code>${!NAME}</code> is supported and applies to all listed
+   * substitution rules. For example, if <code>NAME</code> is set to "VAR", <code>${!NAME}</code>
+   * will reference the value of the variable "VAR" and apply the specified substitution rule (e.g.,
+   * <code>${!NAME:-DEFAULT}</code>).
+   * 
    * @param text the text to expand. It may contain any number of the above expressions, including
    *        none.
    * @return the expanded text
@@ -99,84 +208,91 @@ public class BashSubstitutor {
       throw new IllegalArgumentException("Empty expression");
 
     final CharSequenceCharacterIterator iterator = new CharSequenceCharacterIterator(expression);
+
+    final StringBuilder name = new StringBuilder();
+
+    if (iterator.current() == '!') {
+      name.append(iterator.current());
+      iterator.next();
+    }
+
     if (!isParameterStartChar(iterator.current()))
       throw new IllegalArgumentException("Invalid parameter name");
 
-    final StringBuilder parameter = new StringBuilder();
-    parameter.append(iterator.current());
+    name.append(iterator.current());
     iterator.next();
     while (iterator.current() != CharacterIterator.DONE && isParameterChar(iterator.current())) {
-      parameter.append(iterator.current());
+      name.append(iterator.current());
       iterator.next();
     }
 
     if (iterator.current() == CharacterIterator.DONE) {
-      return handleExpr(parameter.toString());
+      return handleExpr(name);
     } else if (Parsing.attempt(iterator, ":-")) {
       final CharSequence defaultValue = Parsing.slurp(iterator);
-      return handleColonDashExpr(parameter.toString(), defaultValue);
+      return handleColonDashExpr(name, defaultValue);
     } else if (Parsing.attempt(iterator, ":+")) {
       final CharSequence errorMessage = Parsing.slurp(iterator);
-      return handleColonPlusExpr(parameter.toString(), errorMessage);
+      return handleColonPlusExpr(name, errorMessage);
     } else if (Parsing.attempt(iterator, ":?")) {
       final CharSequence errorMessage = Parsing.slurp(iterator);
-      return handleColonQuestionExpr(parameter.toString(), errorMessage);
+      return handleColonQuestionExpr(name, errorMessage);
     } else if (Parsing.attempt(iterator, ":")) {
       final int position = Parsing.parseInt(iterator);
       if (Parsing.attempt(iterator, ":")) {
         int length = Parsing.parseInt(iterator);
         if (iterator.current() != CharacterIterator.DONE)
           throw new IllegalArgumentException("Unsupported pattern: " + expression);
-        return handleColonColonExpr(parameter.toString(), position, length);
+        return handleColonColonExpr(name, position, length);
       } else {
         if (iterator.current() != CharacterIterator.DONE)
           throw new IllegalArgumentException("Unsupported pattern: " + expression);
-        return handleColonExpr(parameter.toString(), position);
+        return handleColonExpr(name, position);
       }
     } else if (Parsing.attempt(iterator, "##")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleHashHashExpr(parameter.toString(), pattern);
+      return handleHashHashExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "#")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleHashExpr(parameter.toString(), pattern);
+      return handleHashExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "%%")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handlePercentPercentExpr(parameter.toString(), pattern);
+      return handlePercentPercentExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "%")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handlePercentExpr(parameter.toString(), pattern);
+      return handlePercentExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "//")) {
       final CharSequence pattern = Parsing.until(iterator, '/');
       Parsing.expect(iterator, "/");
       final CharSequence replacement = Parsing.slurp(iterator);
-      return handleSlashSlashExpr(parameter.toString(), pattern, replacement);
+      return handleSlashSlashExpr(name, pattern, replacement);
     } else if (Parsing.attempt(iterator, "/#")) {
       final CharSequence pattern = Parsing.until(iterator, '/');
       Parsing.expect(iterator, "/");
       final CharSequence replacement = Parsing.slurp(iterator);
-      return handleSlashHashExpr(parameter.toString(), pattern, replacement);
+      return handleSlashHashExpr(name, pattern, replacement);
     } else if (Parsing.attempt(iterator, "/%")) {
       final CharSequence pattern = Parsing.until(iterator, '/');
       Parsing.expect(iterator, "/");
       final CharSequence replacement = Parsing.slurp(iterator);
-      return handleSlashPercentExpr(parameter.toString(), pattern, replacement);
+      return handleSlashPercentExpr(name, pattern, replacement);
     } else if (Parsing.attempt(iterator, "/")) {
       final CharSequence pattern = Parsing.until(iterator, '/');
       Parsing.expect(iterator, "/");
       final CharSequence replacement = Parsing.slurp(iterator);
-      return handleSlashExpr(parameter.toString(), pattern, replacement);
+      return handleSlashExpr(name, pattern, replacement);
     } else if (Parsing.attempt(iterator, "^^")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleCaretCaretExpr(parameter.toString(), pattern);
+      return handleCaretCaretExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "^")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleCaretExpr(parameter.toString(), pattern);
+      return handleCaretExpr(name, pattern);
     } else if (Parsing.attempt(iterator, ",,")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleCommaCommaExpr(parameter.toString(), pattern);
+      return handleCommaCommaExpr(name, pattern);
     } else if (Parsing.attempt(iterator, ",")) {
       final CharSequence pattern = Parsing.slurp(iterator);
-      return handleCommaExpr(parameter.toString(), pattern);
+      return handleCommaExpr(name, pattern);
     } else if (Parsing.attempt(iterator, "@")) {
       final char operator = iterator.current();
       if (operator == CharacterIterator.DONE)
@@ -185,7 +301,7 @@ public class BashSubstitutor {
       if (iterator.next() != CharacterIterator.DONE)
         throw new IllegalArgumentException("Unsupported pattern: " + expression);
 
-      return handleAtExpr(parameter.toString(), operator);
+      return handleAtExpr(name, operator);
     }
 
     throw new IllegalArgumentException("Unsupported pattern: " + expression);
@@ -206,7 +322,7 @@ public class BashSubstitutor {
    * @param name the name of the environment variable
    * @return the value of the environment variable, or an empty string if not found
    */
-  private CharSequence handleExpr(String name) {
+  private CharSequence handleExpr(CharSequence name) {
     if (name == null)
       throw new NullPointerException();
     return findEnvironmentVariable(name).orElse("");
@@ -219,12 +335,17 @@ public class BashSubstitutor {
    * @param defaultValue the default value to return if the environment variable is not found
    * @return the value of the environment variable, or the default value if not found
    */
-  private CharSequence handleColonDashExpr(String name, CharSequence defaultValue) {
+  private CharSequence handleColonDashExpr(CharSequence name, CharSequence defaultValue) {
     if (name == null)
       throw new NullPointerException();
     if (defaultValue == null)
       throw new NullPointerException();
-    return findEnvironmentVariable(name).orElse(defaultValue);
+    try {
+      return findEnvironmentVariable(name).orElse(defaultValue);
+    } catch (UnsetVariableInSubstitutionException e) {
+      // If the variable is unset, we return the default value, even in strict mode.
+      return defaultValue;
+    }
   }
 
   /**
@@ -235,14 +356,19 @@ public class BashSubstitutor {
    * @return the empty string if the environment variable is unset, otherwise the given message
    * 
    */
-  private CharSequence handleColonPlusExpr(String name, CharSequence message) {
+  private CharSequence handleColonPlusExpr(CharSequence name, CharSequence message) {
     if (name == null)
       throw new NullPointerException();
     if (message == null)
       throw new NullPointerException();
-    if (findEnvironmentVariable(name).isPresent())
-      return message;
-    return "";
+    try {
+      if (findEnvironmentVariable(name).isPresent())
+        return message;
+      return "";
+    } catch (UnsetVariableInSubstitutionException e) {
+      // If the variable is unset, we return the empty string, even in strict mode.
+      return "";
+    }
   }
 
   /**
@@ -256,20 +382,26 @@ public class BashSubstitutor {
    * 
    * @throws UnsetVariableInSubstitutionException if the environment variable is unset or empty
    */
-  private CharSequence handleColonQuestionExpr(String name, CharSequence message) {
+  private CharSequence handleColonQuestionExpr(CharSequence name, CharSequence message) {
     if (name == null)
       throw new NullPointerException();
     if (message == null)
       throw new NullPointerException();
 
-    Optional<CharSequence> maybeValue = findEnvironmentVariable(name);
+    Optional<CharSequence> maybeValue;
+    try {
+      maybeValue = findEnvironmentVariable(name);
+    } catch (UnsetVariableInSubstitutionException e) {
+      // In strict mode, just treat this as an empty value. We still throw an exception, just later.
+      maybeValue = Optional.empty();
+    }
     if (maybeValue.isPresent())
       return maybeValue.get();
 
     if (message.length() == 0)
-      throw new UnsetVariableInSubstitutionException(name);
+      throw new UnsetVariableInSubstitutionException(name.toString());
     else
-      throw new UnsetVariableInSubstitutionException(name, message.toString());
+      throw new UnsetVariableInSubstitutionException(name.toString(), message.toString());
   }
 
   /**
@@ -281,7 +413,7 @@ public class BashSubstitutor {
    * @return the substring of the value of the environment variable, starting at the specified
    *         position
    */
-  private CharSequence handleColonExpr(String name, int position) {
+  private CharSequence handleColonExpr(CharSequence name, int position) {
     if (name == null)
       throw new NullPointerException();
 
@@ -306,7 +438,7 @@ public class BashSubstitutor {
    * @return the substring of the value of the environment variable, starting at the specified
    *         position and of the specified length
    */
-  private CharSequence handleColonColonExpr(String name, int position, int length) {
+  private CharSequence handleColonColonExpr(CharSequence name, int position, int length) {
     if (name == null)
       throw new NullPointerException();
 
@@ -332,7 +464,7 @@ public class BashSubstitutor {
     return value.subSequence(start, end);
   }
 
-  private CharSequence handleHashExpr(String name, CharSequence pattern) {
+  private CharSequence handleHashExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -349,7 +481,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handleHashHashExpr(String name, CharSequence pattern) {
+  private CharSequence handleHashHashExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -366,7 +498,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handlePercentExpr(String name, CharSequence pattern) {
+  private CharSequence handlePercentExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -383,7 +515,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handlePercentPercentExpr(String name, CharSequence pattern) {
+  private CharSequence handlePercentPercentExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -400,7 +532,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handleSlashSlashExpr(String name, CharSequence pattern,
+  private CharSequence handleSlashSlashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -416,7 +548,7 @@ public class BashSubstitutor {
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashHashExpr(String name, CharSequence pattern,
+  private CharSequence handleSlashHashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -432,7 +564,7 @@ public class BashSubstitutor {
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashPercentExpr(String name, CharSequence pattern,
+  private CharSequence handleSlashPercentExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -448,7 +580,7 @@ public class BashSubstitutor {
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashExpr(String name, CharSequence pattern,
+  private CharSequence handleSlashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -464,14 +596,14 @@ public class BashSubstitutor {
     return Patterns.replaceFirst(p, value, m -> replacement);
   }
 
-  private CharSequence handleCaretCaretExpr(String name, CharSequence pattern) {
+  private CharSequence handleCaretCaretExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
       throw new NullPointerException();
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
-    
+
     if (pattern.length() == 0)
       pattern = "?";
 
@@ -481,7 +613,7 @@ public class BashSubstitutor {
     return Patterns.replaceAll(p, value, m -> m.group().toUpperCase());
   }
 
-  private CharSequence handleCaretExpr(String name, CharSequence pattern) {
+  private CharSequence handleCaretExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -498,7 +630,7 @@ public class BashSubstitutor {
     return Patterns.replaceFirst(p, value, m -> m.group().toUpperCase());
   }
 
-  private CharSequence handleCommaCommaExpr(String name, CharSequence pattern) {
+  private CharSequence handleCommaCommaExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -515,7 +647,7 @@ public class BashSubstitutor {
     return Patterns.replaceAll(p, value, m -> m.group().toLowerCase());
   }
 
-  private CharSequence handleCommaExpr(String name, CharSequence pattern) {
+  private CharSequence handleCommaExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -532,7 +664,7 @@ public class BashSubstitutor {
     return Patterns.replaceFirst(p, value, m -> m.group().toLowerCase());
   }
 
-  private CharSequence handleAtExpr(String name, char operator) {
+  private CharSequence handleAtExpr(CharSequence name, char operator) {
     if (name == null)
       throw new NullPointerException();
 
@@ -554,13 +686,39 @@ public class BashSubstitutor {
   /**
    * Retrieves the value of the specified environment variable, throwing an exception if not found.
    *
-   * @param name the name of the environment variable
+   * @param reference the name of the environment variable
    * @return the value of the environment variable
+   * 
+   * @throws UnsetVariableInSubstitutionException if the environment variable is unset and this
+   *         instance is in strict mode
+   * @throws NullPointerException if reference is null
+   * @throws IllegalArgumentException if reference is empty
    */
-  protected Optional<CharSequence> findEnvironmentVariable(String name) {
+  protected Optional<CharSequence> findEnvironmentVariable(CharSequence reference) {
+    if (reference == null)
+      throw new NullPointerException();
+    if (reference.length() == 0)
+      throw new IllegalArgumentException("name must not be empty");
+
+    final String name;
+    final boolean dereferenced;
+    if (reference.charAt(0) == '!') {
+      final String namePointer = reference.subSequence(1, reference.length()).toString();
+      final Optional<CharSequence> maybeDereferenced = findEnvironmentVariable(namePointer);
+      if (!maybeDereferenced.isPresent())
+        throw new UnsetVariableInSubstitutionException(namePointer);
+      name = maybeDereferenced.get().toString();
+      dereferenced = true;
+    } else {
+      name = reference.toString();
+      dereferenced = false;
+    }
+
     CharSequence result = getEnv().get(name);
     if (result == null) {
       if (getEnv().containsKey(name))
+        return Optional.empty();
+      if (dereferenced)
         return Optional.empty();
       if (isStrict())
         throw new UnsetVariableInSubstitutionException(name);
@@ -571,14 +729,29 @@ public class BashSubstitutor {
     return Optional.of(result);
   }
 
+  /**
+   * Returns the environment variables used for substitution. The returned map is unmodifiable.
+   * 
+   * @return the environment variables used for substitution
+   */
   public Map<String, String> getEnv() {
     return unmodifiableMap(env);
   }
 
+  /**
+   * Returns whether this instance is in strict mode.
+   * 
+   * @return {@code true} if this instance is in strict mode, {@code false} otherwise
+   */
   public boolean isStrict() {
     return strict;
   }
 
+  /**
+   * Sets whether this instance is in strict mode.
+   * 
+   * @param strict {@code true} if this instance should be in strict mode, {@code false} otherwise
+   */
   public void setStrict(boolean strict) {
     this.strict = strict;
   }
