@@ -2,7 +2,7 @@
 
 A Bash ([Bourne Again SHell](https://www.gnu.org/software/bash/)) substitution library for Java 8+.
 
-This library is intended as a *very* simple templating library with familiar syntax. It is explicitly *not* intended as a full Bash implementation, or to perform anything more than a basic templating library. Performing a substitution only performs basic string manipulation and not shell features. More specifically, it does not (and will not ever) create new processes, access the file system, print to stdout/stderr, etc.
+This library is intended as a *very* simple templating library with familiar syntax. It is explicitly *not* intended as a full Bash implementation, or to perform anything more than basic string manipulation. More specifically, the library does not (and will not ever) create new processes, access the file system, print to stdout/stderr, etc.
 
 ## Features
 
@@ -10,6 +10,7 @@ The library supports the following Bash substitution features:
 
 * Parameter expansion
 * String globbing
+* Indirection (e.g., `${!parameter}`)
 
 The library does not currently support the following Bash substitution features, but may in the future:
 
@@ -17,7 +18,6 @@ The library does not currently support the following Bash substitution features,
 * Quoting
 * Arrays
 * Namerefs
-* Indirection (e.g., `${!parameter}`)
 * Extglob
 
 The library does not currently support the following Bash substitution features, and never will:
@@ -45,23 +45,24 @@ The library does not currently support the following Bash substitution features,
 * `${parameter^^pattern}`
 * `${parameter,pattern}`
 * `${parameter,,pattern}`
-* `${parameter@operator}`, for operators `UuLQ`
+* `${parameter@operator}`, for operators `UuL`
+* `${!parameter}` (indirection, for all of the above)
 
 ## Quick start
 
 To perform substitution using environment variables, use:
 
-    BashSubstitution.substitute("This is my ${ADJECTIVE} template.", System.getenv());
+    BashSubstitution.substitute(System.getenv(), "This is my ${ADJECTIVE} template.");
 
 To perform substitution using system properties, use:
 
-    BashSubstitution.substitute("This is my ${ADJECTIVE} template.", System.getProperties());
+    BashSubstitution.substitute(System.getProperties(), "This is my ${ADJECTIVE} template.");
 
 To perform substitution using custom variables, use:
 
     Map<String, String> customVariables=new HashMap<>();
     customVariables.put("ADJECTIVE", "fancy");
-    BashSubstitution.substitute("This is my ${ADJECTIVE} template.", customVariables);
+    BashSubstitution.substitute(customVariables, "This is my ${ADJECTIVE} template.");
 
 ## Advanced usage
 
@@ -72,10 +73,8 @@ Users can create an instance to perform many substitutions with a given set of v
 
 Users can translate a Bash (string) globbing expression using:
 
-    Pattern p = BashGlobbing.toJavaPattern(globExpression);
-
-## Customization
-
+    // Use true for greedy globbing, or false for non-greedy globbing
+    Pattern p = StringGlobbing.toJavaPattern(globExpression, false);
 
 ### Disabling syntax
 
@@ -83,7 +82,8 @@ By default, the `BashSubstitutor` class supports all the enumerated substitution
 
     // Don't support the ${parameter#word} syntax
     BashSubstitutor substitutor = new BashSubstitutor(variables) {
-        protected String evaluateShortestPrefixSubstitution(String parameter, String prefixWord) {
+        @Override
+        protected CharSequence handleHashExpr(CharSequence name, CharSequence pattern) {
             throw new UnsupportedOperationException("syntax not supported");
         }
     };

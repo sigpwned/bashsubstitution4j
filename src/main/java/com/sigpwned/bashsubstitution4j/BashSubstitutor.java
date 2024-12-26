@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.sigpwned.bashsubstitution4j.util.Globbing;
+import com.sigpwned.bashsubstitution4j.util.StringGlobbing;
 import com.sigpwned.bashsubstitution4j.util.Parsing;
 import com.sigpwned.bashsubstitution4j.util.Patterns;
 
@@ -341,7 +341,7 @@ public class BashSubstitutor {
    * @param name the name of the environment variable
    * @return the value of the environment variable, or an empty string if not found
    */
-  private CharSequence handleExpr(CharSequence name) {
+  protected CharSequence handleExpr(CharSequence name) {
     if (name == null)
       throw new NullPointerException();
     return findEnvironmentVariable(name).orElse("");
@@ -354,7 +354,7 @@ public class BashSubstitutor {
    * @param defaultValue the default value to return if the environment variable is not found
    * @return the value of the environment variable, or the default value if not found
    */
-  private CharSequence handleColonDashExpr(CharSequence name, CharSequence defaultValue) {
+  protected CharSequence handleColonDashExpr(CharSequence name, CharSequence defaultValue) {
     if (name == null)
       throw new NullPointerException();
     if (defaultValue == null)
@@ -375,7 +375,7 @@ public class BashSubstitutor {
    * @return the empty string if the environment variable is unset, otherwise the given message
    * 
    */
-  private CharSequence handleColonPlusExpr(CharSequence name, CharSequence message) {
+  protected CharSequence handleColonPlusExpr(CharSequence name, CharSequence message) {
     if (name == null)
       throw new NullPointerException();
     if (message == null)
@@ -401,7 +401,7 @@ public class BashSubstitutor {
    * 
    * @throws UnsetVariableInSubstitutionException if the environment variable is unset or empty
    */
-  private CharSequence handleColonQuestionExpr(CharSequence name, CharSequence message) {
+  protected CharSequence handleColonQuestionExpr(CharSequence name, CharSequence message) {
     if (name == null)
       throw new NullPointerException();
     if (message == null)
@@ -432,7 +432,7 @@ public class BashSubstitutor {
    * @return the substring of the value of the environment variable, starting at the specified
    *         position
    */
-  private CharSequence handleColonExpr(CharSequence name, int position) {
+  protected CharSequence handleColonExpr(CharSequence name, int position) {
     if (name == null)
       throw new NullPointerException();
 
@@ -457,7 +457,7 @@ public class BashSubstitutor {
    * @return the substring of the value of the environment variable, starting at the specified
    *         position and of the specified length
    */
-  private CharSequence handleColonColonExpr(CharSequence name, int position, int length) {
+  protected CharSequence handleColonColonExpr(CharSequence name, int position, int length) {
     if (name == null)
       throw new NullPointerException();
 
@@ -483,7 +483,7 @@ public class BashSubstitutor {
     return value.subSequence(start, end);
   }
 
-  private CharSequence handleHashExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleHashExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -491,7 +491,7 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile("^" + Globbing.glob(new CharSequenceCharacterIterator(pattern), false));
+        Pattern.compile("^" + StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), false));
     final Matcher m = p.matcher(value);
     if (m.find()) {
       return value.subSequence(m.end(), value.length());
@@ -500,7 +500,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handleHashHashExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleHashHashExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -508,7 +508,7 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile("^" + Globbing.glob(new CharSequenceCharacterIterator(pattern), true));
+        Pattern.compile("^" + StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true));
     final Matcher m = p.matcher(value);
     if (m.find()) {
       return value.subSequence(m.end(), value.length());
@@ -517,7 +517,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handlePercentExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handlePercentExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -525,7 +525,7 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), false) + "$");
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), false) + "$");
     final Matcher m = p.matcher(value);
     if (m.find()) {
       return value.subSequence(0, m.start());
@@ -534,7 +534,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handlePercentPercentExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handlePercentPercentExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -542,7 +542,7 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true) + "$");
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true) + "$");
     final Matcher m = p.matcher(value);
     if (m.find()) {
       return value.subSequence(0, m.start());
@@ -551,7 +551,7 @@ public class BashSubstitutor {
     return value;
   }
 
-  private CharSequence handleSlashSlashExpr(CharSequence name, CharSequence pattern,
+  protected CharSequence handleSlashSlashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -562,12 +562,12 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashHashExpr(CharSequence name, CharSequence pattern,
+  protected CharSequence handleSlashHashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -578,12 +578,12 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p = Pattern
-        .compile("^" + Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        .compile("^" + StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashPercentExpr(CharSequence name, CharSequence pattern,
+  protected CharSequence handleSlashPercentExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -594,12 +594,12 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p = Pattern
-        .compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString() + "$");
+        .compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString() + "$");
 
     return Patterns.replaceAll(p, value, m -> replacement);
   }
 
-  private CharSequence handleSlashExpr(CharSequence name, CharSequence pattern,
+  protected CharSequence handleSlashExpr(CharSequence name, CharSequence pattern,
       CharSequence replacement) {
     if (name == null)
       throw new NullPointerException();
@@ -610,12 +610,12 @@ public class BashSubstitutor {
 
     final CharSequence value = findEnvironmentVariable(name).orElse("");
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceFirst(p, value, m -> replacement);
   }
 
-  private CharSequence handleCaretCaretExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleCaretCaretExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -627,12 +627,12 @@ public class BashSubstitutor {
       pattern = "?";
 
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceAll(p, value, m -> m.group().toUpperCase());
   }
 
-  private CharSequence handleCaretExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleCaretExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -644,12 +644,12 @@ public class BashSubstitutor {
       pattern = "?";
 
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceFirst(p, value, m -> m.group().toUpperCase());
   }
 
-  private CharSequence handleCommaCommaExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleCommaCommaExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -661,12 +661,12 @@ public class BashSubstitutor {
       pattern = "?";
 
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceAll(p, value, m -> m.group().toLowerCase());
   }
 
-  private CharSequence handleCommaExpr(CharSequence name, CharSequence pattern) {
+  protected CharSequence handleCommaExpr(CharSequence name, CharSequence pattern) {
     if (name == null)
       throw new NullPointerException();
     if (pattern == null)
@@ -678,12 +678,12 @@ public class BashSubstitutor {
       pattern = "?";
 
     final Pattern p =
-        Pattern.compile(Globbing.glob(new CharSequenceCharacterIterator(pattern), true).toString());
+        Pattern.compile(StringGlobbing.toJavaPattern(new CharSequenceCharacterIterator(pattern), true).toString());
 
     return Patterns.replaceFirst(p, value, m -> m.group().toLowerCase());
   }
 
-  private CharSequence handleAtExpr(CharSequence name, char operator) {
+  protected CharSequence handleAtExpr(CharSequence name, char operator) {
     if (name == null)
       throw new NullPointerException();
 
