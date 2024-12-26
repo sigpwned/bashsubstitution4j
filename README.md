@@ -1,4 +1,4 @@
-# bashsubstitution4j
+# bashsubstitution4j [![tests](https://github.com/sigpwned/bashsubstitution4j/actions/workflows/tests.yml/badge.svg)](https://github.com/sigpwned/bashsubstitution4j/actions/workflows/tests.yml)
 
 A Bash ([Bourne Again SHell](https://www.gnu.org/software/bash/)) substitution library for Java 8+.
 
