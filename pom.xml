@@ -1,72 +1,177 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.sigpwned</groupId>
     <artifactId>bashsubstitution4j</artifactId>
-    <version>0.0.0</version>
+    <version>0.0.0-SNAPSHOT</version>
+    <name>bashsubstitution4j</name>
+    <inceptionYear>2024</inceptionYear>
+    <description>A Bash-style substitution library for Java 8+</description>
+    <url>https://github.com/sigpwned/bashsubstitution4j</url>
     <packaging>jar</packaging>
 
-    <name>bashsubstitution4j</name>
-    <description>A Java library for performing Bash substitutions on text</description>
-    <url>https://github.com/sigpwned/bashsubstitution4j</url>
+    <organization>
+        <name>Andy Boothe</name>
+        <url>https://www.sigpwned.com/</url>
+    </organization>
+
+    <scm>
+        <connection>scm:git:ssh://git@github.com/sigpwned/bashsubstitution4j.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/sigpwned/bashsubstitution4j.git</developerConnection>
+        <url>https://github.com/sigpwned/bashsubstitution4j/tree/main</url>
+    </scm>
 
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
 
     <developers>
         <developer>
-            <id>sigpwned</id>
-            <name>Your Name</name> <!-- Replace with your name -->
-            <email>youremail@example.com</email> <!-- Replace with your email -->
+            <name>Andy Boothe</name>
+            <email>andy.boothe@gmail.com</email>
         </developer>
     </developers>
 
-    <scm>
-        <url>https://github.com/sigpwned/bashsubstitution4j</url> <!-- Replace with actual repository URL -->
-        <connection>scm:git:git://github.com/sigpwned/bashsubstitution4j.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/sigpwned/bashsubstitution4j.git</developerConnection>
-    </scm>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <name>Sonatype Nexus Snapshots</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <name>Nexus Release Repository</name>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
-    <dependencies>
-        <dependency>
-    <groupId>org.junit.jupiter</groupId>
-    <artifactId>junit-jupiter</artifactId>
-    <version>5.10.0</version> <!-- Replace with the latest version -->
-    <scope>test</scope>
-</dependency>
-    </dependencies>
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/sigpwned/bashsubstitution4j</url>
+    </issueManagement>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>8</maven.compiler.release>
+    </properties>
 
     <build>
         <plugins>
-            <!-- Maven Compiler Plugin -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.10.1</version>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.4.0</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <verbose>false</verbose>
                 </configuration>
-            </plugin>
-
-            <!-- Maven Surefire Plugin for running tests -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M9</version>
+                <executions>
+                    <execution>
+                        <id>update-file-header</id>
+                        <goals>
+                            <goal>update-file-header</goal>
+                        </goals>
+                        <phase>process-sources</phase>
+                        <configuration>
+                            <addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
+                            <processStartTag>=================================LICENSE_START==================================</processStartTag>
+                            <processEndTag>==================================LICENSE_END===================================</processEndTag>
+                            <sectionDelimiter>====================================SECTION=====================================</sectionDelimiter>
+                            <licenseName>apache_v2</licenseName>
+                            <roots>
+                                <root>src/main/java</root>
+                                <root>src/test/java</root>
+                            </roots>
+                            <excludes>
+                                <exclude>**/com/ibm/icu/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- For releasing to maven central -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                                <configuration>
+                                    <failOnError>false</failOnError>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-release-plugin</artifactId>
+                        <configuration>
+                            <tagNameFormat>v@{project.version}</tagNameFormat>
+                            <autoVersionSubmodules>true</autoVersionSubmodules>
+                            <useReleaseProfile>false</useReleaseProfile>
+                            <releaseProfiles>release</releaseProfiles>
+                            <goals>deploy</goals>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
